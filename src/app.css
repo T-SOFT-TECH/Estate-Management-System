@@ -1,5 +1,84 @@
-@import 'tailwindcss';
-@plugin '@tailwindcss/forms';
-@plugin '@tailwindcss/typography';
+/* Global styles for the application */
 
+/* Apply a box-sizing model that includes padding and border in the element's total width and height. */
+html {
+  box-sizing: border-box;
+}
+*, *:before, *:after {
+  box-sizing: inherit;
+}
 
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+  margin: 0;
+  padding: 0;
+  background-color: #ffffff; /* Default background color */
+  color: #333333; /* Default text color */
+  line-height: 1.6;
+}
+
+/* Basic link styling */
+a {
+  color: #007bff; /* Example primary color for links */
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+/* Utility class for visually hidden elements (for accessibility) */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+/* You can define CSS variables for your theme colors here if you prefer */
+:root {
+  --primary-color: #007bff;
+  --secondary-color: #6c757d;
+  --background-color: #ffffff;
+  --text-color: #333333;
+  --light-gray: #f0f0f0;
+  --medium-gray: #ddd;
+}
+
+/* Example of using a CSS variable */
+/*
+body {
+  background-color: var(--background-color);
+  color: var(--text-color);
+}
+*/
+
+/* Tailwind specific styles will be handled by Tailwind,
+   but you can add global overrides or base styles here. */
+/* For example, ensuring headings have a consistent margin or font weight */
+h1, h2, h3, h4, h5, h6 {
+  margin-top: 1.5rem;
+  margin-bottom: 1rem;
+  font-weight: 600;
+}
+
+h1 { font-size: 2.25rem; }
+h2 { font-size: 1.75rem; }
+h3 { font-size: 1.5rem; }
+
+/* Add padding to the main content area - this can also be done in +layout.svelte or specific pages */
+/* main {
+  padding: 1rem;
+} */
+
+/* Ensure images are responsive by default */
+img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}

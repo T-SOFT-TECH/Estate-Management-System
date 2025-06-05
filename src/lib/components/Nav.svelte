@@ -14,16 +14,26 @@
     <li><a href="/" class:active={$page.url.pathname === '/'}>Home</a></li>
     <li><a href="/buildings" class:active={$page.url.pathname.startsWith('/buildings')}>Buildings</a></li>
     {#if $userStore.user}
+      {#if $userStore.user.app_metadata?.role === 'admin'}
+        <li>
+          <a href="/admin/buildings" class:active={$page.url.pathname.startsWith('/admin')}>
+            Admin Panel
+          </a>
+        </li>
+      {/if}
       <li><a href="/profile" class:active={$page.url.pathname === '/profile'}>Profile</a></li>
       <li>
         <button on:click={handleSignOut} class="logout-button">
-          {#if $userStore.loading}Signing out...{:else}Sign Out{/if}
+          {#if $userStore.loading && $userStore.session} <!-- Show loading only if still in session -->
+            Signing out...
+          {:else}
+            Sign Out
+          {/if}
         </button>
       </li>
     {:else}
       <li><a href="/login" class:active={$page.url.pathname === '/login'}>Login</a></li>
     {/if}
-    <!-- Add more links as needed -->
   </ul>
 </nav>
 

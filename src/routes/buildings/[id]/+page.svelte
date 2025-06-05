@@ -1,45 +1,57 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { page } from '$app/stores'; // For accessing route parameters
-  import { supabase } from '$lib/supabaseClient';
+  import { page } from '$app/stores'; // For accessing route parameters and supabase client
   import { userStore } from '$lib/stores/userStore';
   import { goto } from '$app/navigation';
-  import type { Building, Unit } from '$lib/types/database'; // Import types
+  import type { Building, Unit } from '$lib/types/database';
+  import type { SupabaseClient } from '@supabase/supabase-js';
+
+  // $: supabase = $page.data.supabase; // Get Supabase client reactively
 
   let building: Building | null = null;
   let units: Unit[] = [];
   let loadingBuilding = true;
   let loadingUnits = true;
   let error: string | null = null;
-  let sessionLoading = true;
 
   let buildingId: string | null = null;
+  let supabaseClient: SupabaseClient;
 
-  onMount(async () => {
-    buildingId = $page.params.id;
+  $: {
+    if ($page.data.supabase) {
+      supabaseClient = $page.data.supabase;
+      buildingId = $page.params.id;
 
-    const userUnsubscribe = userStore.subscribe(async (value) => {
-      sessionLoading = value.loading;
+      if ($userStore.user && $userStore.session && supabaseClient && buildingId) {
+        // Initial data fetch if conditions met
+        if (building === null && units.length === 0 && (loadingBuilding || loadingUnits)) {
+            fetchAllData(buildingId);
+        }
+      }
+    }
+  }
+
+  onMount(() => {
+    const userUnsubscribe = userStore.subscribe(value => {
       if (!value.loading) {
         if (!value.user || !value.session) {
-          goto(`/login?redirect=/buildings/${buildingId}`);
+          const currentBuildingId = $page.params.id; // get fresh param in case of dynamic nav
+          goto(`/login?redirect=/buildings/${currentBuildingId || ''}`);
         } else {
-          // User is authenticated, proceed to fetch data
-          if (buildingId) {
-            await fetchBuildingDetails(buildingId);
-            await fetchUnits(buildingId);
-          } else {
-            error = "Building ID is missing.";
-            loadingBuilding = false;
-            loadingUnits = false;
+          // User is authenticated, supabaseClient should be available via reactive block
+          // Fetch data if not already fetched/loading
+          const currentBuildingId = $page.params.id;
+          if (supabaseClient && currentBuildingId && (building === null || building?.id !== currentBuildingId || (units.length === 0 && !loadingUnits))) {
+            fetchAllData(currentBuildingId);
           }
         }
       }
     });
 
-    // Initial check
-    if (!$userStore.loading && !$userStore.user) {
-        goto(`/login?redirect=/buildings/${buildingId}`);
+    // Initial check if everything is ready
+    const currentBuildingId = $page.params.id;
+    if (!$userStore.loading && $userStore.user && supabaseClient && currentBuildingId && (building === null || building?.id !== currentBuildingId)) {
+        fetchAllData(currentBuildingId);
     }
 
     return () => {
@@ -47,14 +59,37 @@
     };
   });
 
+  async function fetchAllData(id: string) {
+    if (!supabaseClient) {
+      error = "Supabase client not available.";
+      loadingBuilding = false;
+      loadingUnits = false;
+      return;
+    }
+    // Reset state for potentially new building ID
+    building = null;
+    units = [];
+    error = null;
+    loadingBuilding = true;
+    loadingUnits = true;
+
+    await fetchBuildingDetails(id);
+    // Only fetch units if building was found and no major error occurred
+    if (building && !error) {
+        await fetchUnits(id);
+    } else {
+        loadingUnits = false; // Don't attempt to load units if building failed
+    }
+  }
+
   async function fetchBuildingDetails(id: string) {
     try {
       loadingBuilding = true;
-      const { data, error: fetchError } = await supabase
+      const { data, error: fetchError } = await supabaseClient
         .from('buildings')
         .select('*')
         .eq('id', id)
-        .single(); // Expect one row
+        .single();
 
       if (fetchError) {
         console.error('Error fetching building details:', fetchError);
@@ -75,7 +110,7 @@
   async function fetchUnits(id: string) {
     try {
       loadingUnits = true;
-      const { data, error: fetchError } = await supabase
+      const { data, error: fetchError } = await supabaseClient
         .from('units')
         .select('*')
         .eq('building_id', id)
@@ -83,7 +118,8 @@
 
       if (fetchError) {
         console.error('Error fetching units:', fetchError);
-        if (!error) error = `Error fetching units: ${fetchError.message}`; // Don't overwrite building error
+        // Preserve building error if it exists, otherwise set unit error
+        if (!error) error = `Error fetching units: ${fetchError.message}`;
         units = [];
       } else {
         units = data as Unit[];

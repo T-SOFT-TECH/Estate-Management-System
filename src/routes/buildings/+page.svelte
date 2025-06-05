@@ -1,55 +1,86 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { supabase } from '$lib/supabaseClient';
+  import { page } from '$app/stores'; // To get supabase client from layout data
   import { userStore } from '$lib/stores/userStore';
   import { goto } from '$app/navigation';
-  import type { Building } from '$lib/types/database'; // Import the type
+  import type { Building } from '$lib/types/database';
+  import type { SupabaseClient } from '@supabase/supabase-js';
+
+  // $: supabase = $page.data.supabase; // Get Supabase client reactively
 
   let buildings: Building[] = [];
-  let loading = true;
+  let loadingData = true; // Renamed from 'loading' to be specific to data fetching
   let error: string | null = null;
-  let sessionLoading = true;
+  // sessionLoading is implicitly handled by userStore.loading or $page.data.session presence
 
-  onMount(async () => {
-    const userUnsubscribe = userStore.subscribe(async (value) => {
-      sessionLoading = value.loading;
-      if (!value.loading) {
+  let supabaseClient: SupabaseClient;
+
+  $: {
+    if ($page.data.supabase) {
+      supabaseClient = $page.data.supabase;
+      // Trigger fetch only if user is authenticated and client is available
+      if ($userStore.user && $userStore.session && supabaseClient) {
+        fetchBuildings();
+      }
+    }
+  }
+
+  onMount(() => {
+    // This onMount is now primarily for reacting to userStore changes
+    // or if initial fetch needs to be explicitly managed here.
+    // The reactive block for supabaseClient and $userStore.user should handle most cases.
+
+    const userUnsubscribe = userStore.subscribe(value => {
+      if (!value.loading) { // When userStore is done loading initial auth state
         if (!value.user || !value.session) {
           goto('/login?redirect=/buildings');
         } else {
-          // User is authenticated, proceed to fetch buildings
-          try {
-            loading = true;
-            const { data, error: fetchError } = await supabase
-              .from('buildings')
-              .select('*')
-              .order('name', { ascending: true });
-
-            if (fetchError) {
-              console.error('Error fetching buildings:', fetchError);
-              error = fetchError.message;
-            } else {
-              buildings = data as Building[];
-            }
-          } catch (e: any) {
-            console.error('Exception fetching buildings:', e);
-            error = e.message || 'An unexpected error occurred.';
-          } finally {
-            loading = false;
+          // If supabaseClient is already available, and buildings haven't been fetched yet
+          if (supabaseClient && buildings.length === 0 && loadingData) {
+             fetchBuildings();
           }
         }
       }
     });
 
-    // Initial check in case store is already populated and not loading
-     if (!$userStore.loading && !$userStore.user) {
-        goto('/login?redirect=/buildings');
+    // Initial check if everything is ready
+    if (!$userStore.loading && $userStore.user && supabaseClient && buildings.length === 0 && loadingData) {
+        fetchBuildings();
     }
+
 
     return () => {
       userUnsubscribe();
     };
   });
+
+  async function fetchBuildings() {
+    if (!supabaseClient) {
+      error = "Supabase client not available.";
+      loadingData = false;
+      return;
+    }
+    try {
+      loadingData = true;
+      error = null;
+      const { data: fetchedData, error: fetchError } = await supabaseClient
+        .from('buildings')
+        .select('*')
+        .order('name', { ascending: true });
+
+      if (fetchError) {
+        console.error('Error fetching buildings:', fetchError);
+        error = fetchError.message;
+      } else {
+        buildings = fetchedData as Building[];
+      }
+    } catch (e: any) {
+      console.error('Exception fetching buildings:', e);
+      error = e.message || 'An unexpected error occurred.';
+    } finally {
+      loadingData = false;
+    }
+  }
 </script>
 
 <svelte:head>

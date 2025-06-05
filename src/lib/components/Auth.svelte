@@ -1,8 +1,10 @@
 <script lang="ts">
-  import { supabase } from '$lib/supabaseClient';
-  import { userStore, signOut as userSignOut } from '$lib/stores/userStore';
+  import { page } from '$app/stores'; // To get supabase client from layout data
+  import { userStore, signOut as userSignOutExternal } from '$lib/stores/userStore';
   import { goto } from '$app/navigation';
-  import { onMount } from 'svelte';
+  import type { SupabaseClient } from '@supabase/supabase-js';
+
+  // $: supabase = $page.data.supabase; // Get the Supabase client reactively
 
   let email = '';
   let password = '';
@@ -12,12 +14,24 @@
 
   let showSignIn = true; // Toggle between Sign In and Sign Up form
 
+  // Helper to get the Supabase client instance from page data
+  function getSupabaseClient(): SupabaseClient {
+    // $: is not allowed in functions, so we access $page directly or pass client as prop
+    // For components, it's often better to pass `supabase` as a prop if possible,
+    // or ensure $page.data.supabase is available when functions are called.
+    if (!$page.data.supabase) {
+      throw new Error("Supabase client not available. Ensure it's passed in page data from +layout.ts");
+    }
+    return $page.data.supabase;
+  }
+
   async function handleSignIn() {
     loading = true;
     message = '';
     error = '';
+    const supabaseClient = getSupabaseClient();
     try {
-      const { data, error: signInError } = await supabase.auth.signInWithPassword({
+      const { data, error: signInError } = await supabaseClient.auth.signInWithPassword({
         email: email,
         password: password,
       });
@@ -25,7 +39,7 @@
         console.error('Sign-in error:', signInError.message);
         error = signInError.message || 'Invalid login credentials.';
       } else if (data.user) {
-        // userStore will be updated by onAuthStateChange
+        // userStore will be updated by onAuthStateChange in root layout
         message = 'Signed in successfully! Redirecting...';
         await goto('/profile'); // Redirect to a protected route
       } else {
@@ -43,11 +57,12 @@
     loading = true;
     message = '';
     error = '';
+    const supabaseClient = getSupabaseClient();
     try {
-      const { data, error: signUpError } = await supabase.auth.signUp({
+      const { data, error: signUpError } = await supabaseClient.auth.signUp({
         email: email,
         password: password,
-        // options: { emailRedirectTo: `${location.origin}/welcome` } // Optional: for email confirmation
+        // options: { emailRedirectTo: `${location.origin}/auth/confirm` } // Standard confirm path
       });
       if (signUpError) {
         console.error('Sign-up error:', signUpError.message);
@@ -57,14 +72,9 @@
         }
       } else if (data.user?.identities?.length === 0) {
         error = 'User already exists but is unconfirmed. Please check your email for a confirmation link or try signing in.';
-      }
-       else if (data.user) {
-        // userStore will be updated by onAuthStateChange
+      } else if (data.user) {
+        // userStore will be updated by onAuthStateChange in root layout
         message = 'Signed up successfully! Please check your email for a confirmation link if required, then sign in.';
-        // Depending on your Supabase settings (email confirmation),
-        // user might need to confirm email before being able to log in.
-        // For now, we'll just show a message.
-        // Consider redirecting or automatically signing in if auto-confirmation is enabled.
         showSignIn = true; // Switch to sign-in form
       } else {
          error = 'An unexpected error occurred during sign up.';
@@ -81,9 +91,9 @@
     loading = true;
     error = '';
     message = '';
-    await userSignOut(); // Use the signOut from userStore
+    const supabaseClient = getSupabaseClient();
+    await userSignOutExternal(supabaseClient); // Pass the client to the external signOut function
     message = 'Signed out successfully.';
-    // No need to redirect here as Nav will update
     loading = false;
   }
 

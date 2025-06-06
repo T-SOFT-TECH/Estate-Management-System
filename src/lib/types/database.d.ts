@@ -27,3 +27,15 @@ import type { Database as DB } from './supabase-generated'; // Adjust path
 export type Building = DB['public']['Tables']['buildings']['Row'];
 export type Unit = DB['public']['Tables']['units']['Row'];
 */
+
+export interface VisitorPreregistration {
+  id: string; // UUID
+  resident_user_id: string; // UUID of the user from auth.users
+  visitor_name: string;
+  expected_date: string; // Format: YYYY-MM-DD
+  expected_time?: string | null; // Format: HH:MM or HH:MM:SS
+  vehicle_plate?: string | null;
+  status: 'pending' | 'active' | 'completed' | 'cancelled' | 'expired';
+  created_at: string; // TIMESTAMPTZ
+  updated_at: string; // TIMESTAMPTZ
+}

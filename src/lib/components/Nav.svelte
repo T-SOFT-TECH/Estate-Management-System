@@ -20,6 +20,13 @@
             Admin Panel
           </a>
         </li>
+      {:else}
+        <!-- Show "My Visitors" for non-admin authenticated users -->
+        <li>
+          <a href="/visitors" class:active={$page.url.pathname.startsWith('/visitors')}>
+            My Visitors
+          </a>
+        </li>
       {/if}
       <li><a href="/profile" class:active={$page.url.pathname === '/profile'}>Profile</a></li>
       <li>
